@@ -26,9 +26,10 @@ npm install
 
 ### 2. キーを用意
 - `THREADS_ACCESS_TOKEN` / `THREADS_USER_ID` … 取得済み（`.env` にあり）
-- `OPENAI_API_KEY` … OpenAIのキー
-- `PEXELS_API_KEY` … https://www.pexels.com/api/ で無料取得（**任意・後から追加OK**。未設定なら gpt-image-1 の生成のみで動作。キーを足すと「素材取得→加工」に自動切替）
-- （任意）`GH_PAT` … トークン自動更新用。`secrets:write` 権限のPAT
+- `ANTHROPIC_API_KEY` … **文章生成(Claude)用**。https://console.anthropic.com で発行
+- `OPENAI_API_KEY` … **画像生成(gpt-image-1)用**
+- `PEXELS_API_KEY` … https://www.pexels.com/api/ で無料取得（**任意・後から追加OK**。未設定なら生成のみ。キーを足すと「素材取得→加工」に自動切替）
+- （任意）`ANTHROPIC_MODEL` … 既定は `claude-opus-4-8`。コスト重視なら `claude-sonnet-5` / `claude-haiku-4-5` を指定可
 
 `.env.example` をコピーして `.env` を作り、値を入れます（`.env` はGitに上がりません）。
 
@@ -42,8 +43,9 @@ npm run post       # ※ローカルは THREADS_IMAGE_REPO か THREADS_IMAGE_BAS
 1. GitHubで**リポジトリを作成**（画像を raw URL で配るため **public** 推奨）
 2. リポジトリの **Settings → Secrets and variables → Actions** に登録：
    - `THREADS_ACCESS_TOKEN`, `THREADS_USER_ID`
-   - `OPENAI_API_KEY`, `PEXELS_API_KEY`（Pexelsは任意）
-   - （任意）Variables に `OPENAI_TEXT_MODEL`
+   - `ANTHROPIC_API_KEY`（文章）, `OPENAI_API_KEY`（画像）
+   - `PEXELS_API_KEY`（任意）
+   - （任意）Variables に `ANTHROPIC_MODEL`
 3. このフォルダを push
 4. **Actions タブ → 「Threads 自動投稿」→ Run workflow** で手動テスト
 5. うまくいったら、`.github/workflows/auto-post.yml` の `cron` を好きな時刻に調整

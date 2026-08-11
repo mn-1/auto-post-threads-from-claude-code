@@ -3,15 +3,18 @@
 import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
+import Anthropic from "@anthropic-ai/sdk";
 import { ROOT, loadEnv, loadPersona, requireEnv } from "./config.mjs";
 
 loadEnv();
-requireEnv(["OPENAI_API_KEY"]);
+// 文章=Claude(ANTHROPIC) / 画像=OpenAI(gpt-image-1) の2つのキーを使う
+requireEnv(["ANTHROPIC_API_KEY", "OPENAI_API_KEY"]);
 const persona = loadPersona();
 
 const OPENAI = "https://api.openai.com/v1";
-const KEY = process.env.OPENAI_API_KEY;
-const TEXT_MODEL = process.env.OPENAI_TEXT_MODEL || "gpt-4o";
+const KEY = process.env.OPENAI_API_KEY; // 画像生成用
+const anthropic = new Anthropic(); // ANTHROPIC_API_KEY を自動で読む
+const TEXT_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-8";
 
 // --- ネタと型を決める（乱数を使わず、日付＋時刻で決定的に回す）---
 // 1日に複数回走っても、時刻(UTC hour)が違うので別のネタ・型になる。
@@ -53,22 +56,21 @@ const userPrompt = `ジャンル: ${persona.genre}
 
 上記に沿って「${style}」で投稿本文を1本書いてください。`;
 
-async function openaiChat() {
-  const r = await fetch(`${OPENAI}/chat/completions`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: TEXT_MODEL,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.9,
-    }),
+async function generateText() {
+  // Claude（公式Anthropic SDK）で本文生成。Opus 4.8 は temperature 非対応なので渡さない。
+  const res = await anthropic.messages.create({
+    model: TEXT_MODEL,
+    max_tokens: 1024,
+    system: systemPrompt,
+    messages: [{ role: "user", content: userPrompt }],
   });
-  const j = await r.json();
-  if (!r.ok) throw new Error("OpenAI本文生成に失敗: " + JSON.stringify(j));
-  return j.choices[0].message.content.trim();
+  const text = res.content
+    .filter((b) => b.type === "text")
+    .map((b) => b.text)
+    .join("")
+    .trim();
+  if (!text) throw new Error("Claude本文生成に失敗: 空の応答 " + JSON.stringify(res));
+  return text;
 }
 
 // 保険：句読点が混ざったら除去（ルール徹底）
@@ -194,7 +196,7 @@ async function overlayText(buf, headline) {
 }
 
 // --- 実行 ---
-const text = sanitize(await openaiChat());
+const text = sanitize(await generateText());
 console.log("📝 本文生成:\n" + text + "\n");
 
 const imgStyle = persona.image?.style || "明るくミニマルな写真";

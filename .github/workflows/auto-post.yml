@@ -32,9 +32,10 @@ jobs:
 
       - name: 本文＋画像を生成
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_TEXT_MODEL: ${{ vars.OPENAI_TEXT_MODEL }}
-          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }} # 文章生成(Claude)
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}         # 任意(既定 claude-opus-4-8)
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}        # 画像生成(gpt-image-1)
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}        # 任意(素材)
         run: npm run generate
 
       - name: 画像をコミット＆プッシュ（raw URL用）
