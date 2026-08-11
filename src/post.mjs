@@ -16,12 +16,18 @@ if (!existsSync(outboxPath)) {
   console.error("⚠️ outbox/post.json がありません。先に npm run generate を実行してください。");
   process.exit(1);
 }
-const { text, imagePath } = JSON.parse(readFileSync(outboxPath, "utf8"));
+const post = JSON.parse(readFileSync(outboxPath, "utf8"));
+
+// --- 投稿本数を正規化：単発でもツリー(thread配列)でも同じ形で扱う ---
+// thread: [{ text, imagePath }, ...] があればツリー投稿。無ければ単発 { text, imagePath }。
+const segments = Array.isArray(post.thread) && post.thread.length
+  ? post.thread.map((s) => ({ text: s.text, imagePath: s.imagePath || null }))
+  : [{ text: post.text, imagePath: post.imagePath || null }];
 
 // --- 画像の公開URLを決める ---
 // 優先: THREADS_IMAGE_BASE_URL（任意のホスティングを使う場合）
 // 既定: GitHub raw（owner/repo は GITHUB_REPOSITORY、SHAは現在のHEAD＝push済みコミット）
-function imageUrl() {
+function imageUrl(imagePath) {
   const path = imagePath.replace(/\\/g, "/");
   if (process.env.THREADS_IMAGE_BASE_URL) {
     return `${process.env.THREADS_IMAGE_BASE_URL.replace(/\/$/, "")}/${path}`;
@@ -51,42 +57,68 @@ async function getUserId() {
 }
 
 const userId = await getUserId();
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// 画像があれば IMAGE 投稿、なければ TEXT 投稿（基本はテキストのみ）
-const params = { access_token: TOKEN, text };
-if (imagePath) {
-  const url = imageUrl();
-  console.log("🖼️  画像URL: " + url);
-  params.media_type = "IMAGE";
-  params.image_url = url;
+// 1本を公開する。replyToId があれば、その投稿へのリプライ（＝ツリーの続き）になる。
+// 戻り値: 公開された post_id（次の本の reply_to_id に使う）。
+async function publishOne({ text, imagePath }, replyToId) {
+  // Step 1: コンテナ作成（画像があれば IMAGE、なければ TEXT）
+  const params = { access_token: TOKEN, text };
+  if (imagePath) {
+    const url = imageUrl(imagePath);
+    console.log("🖼️  画像URL: " + url);
+    params.media_type = "IMAGE";
+    params.image_url = url;
+  } else {
+    console.log("📄 テキストのみ");
+    params.media_type = "TEXT";
+  }
+  if (replyToId) params.reply_to_id = replyToId; // ← ツリーの肝：直前の投稿にぶら下げる
+
+  const r1 = await fetch(`${BASE}/${userId}/threads`, {
+    method: "POST",
+    body: new URLSearchParams(params),
+  });
+  const c = await r1.json();
+  if (!c.id) {
+    throw new Error(
+      "コンテナ作成に失敗: " +
+        JSON.stringify(c) +
+        "\nヒント: トークンに『threads_content_publish』権限が無い可能性があります。" +
+        "Metaアプリの権限設定を確認し、その権限を含めてトークンを再発行してください。"
+    );
+  }
+
+  // Step 2: 公開。画像は取り込みに時間がかかるため長めに待つ（公式推奨: 画像は最低30秒）
+  const waitMs = imagePath ? 30000 : 3000;
+  console.log(`⏳ ${waitMs / 1000}秒待ってから公開します`);
+  await sleep(waitMs);
+  const r2 = await fetch(`${BASE}/${userId}/threads_publish`, {
+    method: "POST",
+    body: new URLSearchParams({ creation_id: c.id, access_token: TOKEN }),
+  });
+  const p = await r2.json();
+  if (!p.id) throw new Error("公開に失敗: " + JSON.stringify(p));
+  return p.id;
+}
+
+// --- 実行：単発は1本、ツリーは reply_to_id で数珠つなぎに連投 ---
+const isThread = segments.length > 1;
+if (isThread) console.log(`🧵 ツリー投稿：全${segments.length}本`);
+
+let prevId = null;
+const publishedIds = [];
+for (let i = 0; i < segments.length; i++) {
+  if (isThread) console.log(`\n— ${i + 1}/${segments.length}本目 —`);
+  const id = await publishOne(segments[i], prevId);
+  publishedIds.push(id);
+  console.log(`✅ 公開: post_id ${id}`);
+  prevId = id; // 次の本はこの投稿へのリプライにする
+  if (i < segments.length - 1) await sleep(2000); // 連投の間隔を少し空ける
+}
+
+if (isThread) {
+  console.log(`\n🎉 ツリー投稿できました！ 先頭 post_id: ${publishedIds[0]}（全${publishedIds.length}本）`);
 } else {
-  console.log("📄 テキストのみ投稿");
-  params.media_type = "TEXT";
+  console.log(`\n🎉 投稿できました！ post_id: ${publishedIds[0]}`);
 }
-
-// Step 1: コンテナ作成
-const r1 = await fetch(`${BASE}/${userId}/threads`, {
-  method: "POST",
-  body: new URLSearchParams(params),
-});
-const c = await r1.json();
-if (!c.id) {
-  throw new Error(
-    "コンテナ作成に失敗: " +
-      JSON.stringify(c) +
-      "\nヒント: トークンに『threads_content_publish』権限が無い可能性があります。" +
-      "Metaアプリの権限設定を確認し、その権限を含めてトークンを再発行してください。"
-  );
-}
-
-// Step 2: 公開。画像は取り込みに時間がかかるため長めに待つ（公式推奨: 画像は最低30秒）
-const waitMs = imagePath ? 30000 : 3000;
-console.log(`⏳ ${waitMs / 1000}秒待ってから公開します`);
-await new Promise((r) => setTimeout(r, waitMs));
-const r2 = await fetch(`${BASE}/${userId}/threads_publish`, {
-  method: "POST",
-  body: new URLSearchParams({ creation_id: c.id, access_token: TOKEN }),
-});
-const p = await r2.json();
-if (!p.id) throw new Error("公開に失敗: " + JSON.stringify(p));
-console.log(`✅ 投稿できました！ post_id: ${p.id}`);
