@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Bash(cat *.env*)",
+      "Bash(cat *.env)",
+      "Bash(type *.env*)",
+      "Bash(more *.env*)",
+      "Bash(less *.env*)",
+      "Bash(head *.env*)",
+      "Bash(tail *.env*)",
+      "Bash(grep * .env*)",
+      "Bash(nl *.env*)",
+      "Bash(xxd *.env*)",
+      "Bash(od *.env*)",
+      "Bash(strings *.env*)",
+      "Bash(sort *.env*)",
+      "Bash(awk * .env*)",
+      "Bash(sed * .env*)",
+      "Bash(Get-Content *.env*)",
+      "Bash(gc *.env*)"
+    ]
+  }
+}

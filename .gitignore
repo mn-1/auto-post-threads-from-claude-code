@@ -1,0 +1,15 @@
+# 戦略・ノウハウ・メモ（GitHubに上げない）
+_private/
+
+# 認証情報（絶対に上げない）
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+
+# 生成物の作業ファイル（画像は outbox/images/ に置いて別途コミットします）
+outbox/post.json
+*.log
+.new_token

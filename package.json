@@ -1,0 +1,19 @@
+{
+  "name": "auto-threads",
+  "version": "1.0.0",
+  "description": "Threads 完全自動投稿（本文AI生成 + ハイブリッド画像 + GitHub Actions）",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "generate": "node src/generate.mjs",
+    "post": "node src/post.mjs",
+    "refresh-token": "node src/refreshToken.mjs",
+    "run": "node src/generate.mjs && node src/post.mjs"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "sharp": "^0.33.5"
+  }
+}

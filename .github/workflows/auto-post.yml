@@ -1,0 +1,56 @@
+name: Threads 自動投稿
+
+on:
+  schedule:
+    # UTCで指定。日本時間(JST)= UTC+9。1日3投稿（朝の通勤前＋夜のゴールデンタイム）。
+    # リサーチ結論: 朝7-9時(他SNSの約2.3倍) / 夜18-21時が最も反応が良い。昼12-13時は競合が激しく回避。
+    - cron: "0 22 * * *" # 07:00 JST（朝の通勤・始業前）
+    - cron: "0 9 * * *"  # 18:00 JST（夜のゴールデンタイム開始）
+    - cron: "0 12 * * *" # 21:00 JST（夜のピーク）
+  workflow_dispatch: {} # 手動実行ボタン（テスト用）
+
+# 生成画像をリポジトリに push するために書き込み権限が必要
+permissions:
+  contents: write
+
+concurrency:
+  group: threads-auto-post
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install deps
+        run: npm ci || npm install
+
+      - name: 本文＋画像を生成
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_TEXT_MODEL: ${{ vars.OPENAI_TEXT_MODEL }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+        run: npm run generate
+
+      - name: 画像をコミット＆プッシュ（raw URL用）
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add outbox/images
+          git commit -m "post image $(date -u +%Y-%m-%dT%H:%M:%SZ)" || echo "no image change"
+          git push
+
+      - name: Threads に公開
+        env:
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: npm run post
+
+  # ※ トークンは「手動更新」運用（60日失効前に自分で更新）。
+  #    手順は やることリスト.md を参照。自動更新にしたくなったら refresh ジョブを足せます。
