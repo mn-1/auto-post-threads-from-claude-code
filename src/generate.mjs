@@ -1,6 +1,6 @@
 // 本文生成 + 画像生成（ハイブリッド：Pexels素材取得 → gpt-image-1で加工 → 文字入れ）
 // 出力: outbox/post.json（本文）と outbox/images/<日付>.png（画像）
-import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
 import Anthropic from "@anthropic-ai/sdk";
@@ -247,4 +247,14 @@ writeFileSync(
   JSON.stringify({ text, imagePath: imgRel, topic, style, createdAt: stamp }, null, 2)
 );
 console.log(`🖼️  画像を保存: ${imgRel}`);
+
+// --- 古い画像を掃除（直近数枚だけ残す。投稿後は不要なため）---
+// ファイル名が日付順=辞書順なので sort でそのまま時系列になる。
+const KEEP = 3;
+const imgDir = join(ROOT, "outbox", "images");
+const imgs = readdirSync(imgDir).filter((f) => f.endsWith(".png")).sort();
+const stale = imgs.slice(0, Math.max(0, imgs.length - KEEP));
+for (const f of stale) unlinkSync(join(imgDir, f));
+if (stale.length) console.log(`🧹 古い画像を${stale.length}枚削除（直近${KEEP}枚を保持）`);
+
 console.log("✅ 生成完了 → 次は src/post.mjs で公開します");
