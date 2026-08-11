@@ -51,13 +51,23 @@ async function getUserId() {
 }
 
 const userId = await getUserId();
-const url = imageUrl();
-console.log("🖼️  画像URL: " + url);
 
-// Step 1: 画像コンテナ作成
+// 画像があれば IMAGE 投稿、なければ TEXT 投稿（基本はテキストのみ）
+const params = { access_token: TOKEN, text };
+if (imagePath) {
+  const url = imageUrl();
+  console.log("🖼️  画像URL: " + url);
+  params.media_type = "IMAGE";
+  params.image_url = url;
+} else {
+  console.log("📄 テキストのみ投稿");
+  params.media_type = "TEXT";
+}
+
+// Step 1: コンテナ作成
 const r1 = await fetch(`${BASE}/${userId}/threads`, {
   method: "POST",
-  body: new URLSearchParams({ media_type: "IMAGE", image_url: url, text, access_token: TOKEN }),
+  body: new URLSearchParams(params),
 });
 const c = await r1.json();
 if (!c.id) {
@@ -69,8 +79,10 @@ if (!c.id) {
   );
 }
 
-// Step 2: 画像取り込みを待ってから公開（数秒必要）
-await new Promise((r) => setTimeout(r, 8000));
+// Step 2: 公開。画像は取り込みに時間がかかるため長めに待つ（公式推奨: 画像は最低30秒）
+const waitMs = imagePath ? 30000 : 3000;
+console.log(`⏳ ${waitMs / 1000}秒待ってから公開します`);
+await new Promise((r) => setTimeout(r, waitMs));
 const r2 = await fetch(`${BASE}/${userId}/threads_publish`, {
   method: "POST",
   body: new URLSearchParams({ creation_id: c.id, access_token: TOKEN }),

@@ -27,8 +27,7 @@ npm install
 ### 2. キーを用意
 - `THREADS_ACCESS_TOKEN` / `THREADS_USER_ID` … 取得済み（`.env` にあり）
 - `ANTHROPIC_API_KEY` … **文章生成(Claude)用・必須**。https://console.anthropic.com で発行
-- `OPENAI_API_KEY` … **画像のAI加工(gpt-image-1)用・任意**。残高が無い/未設定でも、Pexels素材＋文字入れで投稿は継続（無料フォールバック）
-- `PEXELS_API_KEY` … https://www.pexels.com/api/ で無料取得。**フォールバック時の画像素材**にも使う（推奨）
+- 画像は**外部API不要**。基本テキストのみ、朝の枠だけローカルで簡単な引用カードを生成します（OpenAI/Pexelsは使いません）
 - （任意）`ANTHROPIC_MODEL` … 既定は `claude-opus-4-8`。コスト重視なら `claude-sonnet-5` / `claude-haiku-4-5` を指定可
 
 `.env.example` をコピーして `.env` を作り、値を入れます（`.env` はGitに上がりません）。
@@ -43,8 +42,7 @@ npm run post       # ※ローカルは THREADS_IMAGE_REPO か THREADS_IMAGE_BAS
 1. GitHubで**リポジトリを作成**（画像を raw URL で配るため **public** 推奨）
 2. リポジトリの **Settings → Secrets and variables → Actions** に登録：
    - `THREADS_ACCESS_TOKEN`, `THREADS_USER_ID`
-   - `ANTHROPIC_API_KEY`（文章）, `OPENAI_API_KEY`（画像）
-   - `PEXELS_API_KEY`（任意）
+   - `ANTHROPIC_API_KEY`（文章生成・必須）
    - （任意）Variables に `ANTHROPIC_MODEL`
 3. このフォルダを push
 4. **Actions タブ → 「Threads 自動投稿」→ Run workflow** で手動テスト
