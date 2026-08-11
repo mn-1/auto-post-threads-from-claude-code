@@ -151,7 +151,7 @@ let imagePath = null;
 
 if (wantImage) {
   const hook = text.split("\n")[0].replace(/[？?…]/g, "").trim();
-  const handle = persona.image?.handle || "みう";
+  const handle = persona.image?.handle || "アリス";
   const imgBuf = await makeCard(hook, handle);
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
   imagePath = `outbox/images/${stamp}.png`;
