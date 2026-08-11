@@ -37,10 +37,17 @@ function imageUrl() {
 }
 
 async function getUserId() {
-  if (process.env.THREADS_USER_ID) return process.env.THREADS_USER_ID;
+  // トークンから正しいユーザーIDを取得（手動設定のズレを根本的に防ぐ）。
+  // /me が通ればトークン自体も有効。失敗時のみ環境変数を予備に使う。
   const me = await (await fetch(`${BASE}/me?fields=id,username&access_token=${TOKEN}`)).json();
-  if (!me.id) throw new Error("ユーザーID取得に失敗: " + JSON.stringify(me));
-  return me.id;
+  if (me.id) {
+    console.log(`👤 投稿アカウント: @${me.username}（id: ${me.id}）`);
+    return me.id;
+  }
+  if (process.env.THREADS_USER_ID) return process.env.THREADS_USER_ID;
+  throw new Error(
+    "ユーザーID取得に失敗（トークンが無効/期限切れ/権限不足の可能性）: " + JSON.stringify(me)
+  );
 }
 
 const userId = await getUserId();
@@ -53,7 +60,14 @@ const r1 = await fetch(`${BASE}/${userId}/threads`, {
   body: new URLSearchParams({ media_type: "IMAGE", image_url: url, text, access_token: TOKEN }),
 });
 const c = await r1.json();
-if (!c.id) throw new Error("コンテナ作成に失敗: " + JSON.stringify(c));
+if (!c.id) {
+  throw new Error(
+    "コンテナ作成に失敗: " +
+      JSON.stringify(c) +
+      "\nヒント: トークンに『threads_content_publish』権限が無い可能性があります。" +
+      "Metaアプリの権限設定を確認し、その権限を含めてトークンを再発行してください。"
+  );
+}
 
 // Step 2: 画像取り込みを待ってから公開（数秒必要）
 await new Promise((r) => setTimeout(r, 8000));
