@@ -7,8 +7,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { ROOT, loadEnv, loadPersona, requireEnv } from "./config.mjs";
 
 loadEnv();
-// 文章=Claude(ANTHROPIC) / 画像=OpenAI(gpt-image-1) の2つのキーを使う
-requireEnv(["ANTHROPIC_API_KEY", "OPENAI_API_KEY"]);
+// 文章=Claude(必須)。画像のAI加工=OpenAI(任意・無ければ無料フォールバック)。
+requireEnv(["ANTHROPIC_API_KEY"]);
 const persona = loadPersona();
 
 const OPENAI = "https://api.openai.com/v1";
@@ -122,11 +122,9 @@ async function editWithRefs(refs, prompt) {
   return j.data[0].b64_json;
 }
 
-async function makeImage(imgPrompt, stockQuery) {
-  const charRefs = loadCharacterRefs();
-  const stock = await fetchStock(stockQuery);
+// gpt-image-1（有料）で画像を作る。失敗しても投稿は止めない。
+async function aiImage(imgPrompt, charRefs, stock) {
   let b64;
-
   if (charRefs.length) {
     // キャラ基準画像あり → 顔・髪型・雰囲気を固定したまま、シーンだけ差し替え
     console.log(
@@ -144,11 +142,7 @@ async function makeImage(imgPrompt, stockQuery) {
     console.log("🎨 画像モード: Pexels素材を取得 → gpt-image-1で加工（キャラ画像は未配置）");
     b64 = await editWithRefs([{ buf: stock, name: "stock.jpg", type: "image/jpeg" }], imgPrompt);
   } else {
-    console.log(
-      process.env.PEXELS_API_KEY
-        ? "🎨 画像モード: 素材もキャラ画像も無し → gpt-image-1の生成のみ"
-        : "🎨 画像モード: キャラ画像・PEXELS_API_KEY 未設定 → gpt-image-1の生成のみ（後で追加すれば自動で切替）"
-    );
+    console.log("🎨 画像モード: 素材もキャラ画像も無し → gpt-image-1の生成のみ");
     const r = await fetch(`${OPENAI}/images/generations`, {
       method: "POST",
       headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
@@ -159,6 +153,38 @@ async function makeImage(imgPrompt, stockQuery) {
     b64 = j.data[0].b64_json;
   }
   return Buffer.from(b64, "base64");
+}
+
+async function makeImage(imgPrompt, stockQuery) {
+  const charRefs = loadCharacterRefs();
+  const stock = await fetchStock(stockQuery);
+
+  // OpenAIキーがあれば gpt-image-1 を試す。失敗しても無料フォールバックに切替。
+  if (KEY) {
+    try {
+      return await aiImage(imgPrompt, charRefs, stock);
+    } catch (e) {
+      console.warn("⚠️ gpt-image-1 が使えません（残高不足など）→ 無料フォールバックに切替: " + e.message);
+    }
+  } else {
+    console.log("🎨 画像モード: OpenAIキー未設定 → 無料フォールバックで画像を用意");
+  }
+
+  // --- 無料フォールバック（OpenAI不要）: Pexels素材 → みう画像 → 無地カード ---
+  if (stock) {
+    console.log("🖼️ フォールバック: Pexels素材をそのまま使用（後で文字入れ）");
+    return stock;
+  }
+  if (charRefs.length) {
+    console.log("🖼️ フォールバック: みう基準画像を使用");
+    return charRefs[0].buf;
+  }
+  console.log("🖼️ フォールバック: 無地カードを生成");
+  return sharp({
+    create: { width: 1080, height: 1080, channels: 3, background: { r: 244, g: 241, b: 234 } },
+  })
+    .png()
+    .toBuffer();
 }
 
 // SVG用のエスケープと簡易折り返し

@@ -26,9 +26,9 @@ npm install
 
 ### 2. キーを用意
 - `THREADS_ACCESS_TOKEN` / `THREADS_USER_ID` … 取得済み（`.env` にあり）
-- `ANTHROPIC_API_KEY` … **文章生成(Claude)用**。https://console.anthropic.com で発行
-- `OPENAI_API_KEY` … **画像生成(gpt-image-1)用**
-- `PEXELS_API_KEY` … https://www.pexels.com/api/ で無料取得（**任意・後から追加OK**。未設定なら生成のみ。キーを足すと「素材取得→加工」に自動切替）
+- `ANTHROPIC_API_KEY` … **文章生成(Claude)用・必須**。https://console.anthropic.com で発行
+- `OPENAI_API_KEY` … **画像のAI加工(gpt-image-1)用・任意**。残高が無い/未設定でも、Pexels素材＋文字入れで投稿は継続（無料フォールバック）
+- `PEXELS_API_KEY` … https://www.pexels.com/api/ で無料取得。**フォールバック時の画像素材**にも使う（推奨）
 - （任意）`ANTHROPIC_MODEL` … 既定は `claude-opus-4-8`。コスト重視なら `claude-sonnet-5` / `claude-haiku-4-5` を指定可
 
 `.env.example` をコピーして `.env` を作り、値を入れます（`.env` はGitに上がりません）。
